@@ -15,6 +15,7 @@ if "bpy" in locals():
 
 import bpy
 import numpy as np
+import json
 from mathutils import Matrix
 
 from . import export_context
@@ -103,8 +104,16 @@ class SceneConverter:
                 geometry.export_object(object_instance, self.export_ctx, evaluated_obj.name in particles)
             elif object_type == 'CAMERA':
                 # When rendering inside blender, export only the active camera
-                if (self.render and evaluated_obj.name_full == b_scene.camera.name_full) or not self.render:
-                    camera.export_camera(object_instance, b_scene, self.export_ctx)
+                # if (self.render and evaluated_obj.name_full == b_scene.camera.name_full) or not self.render:
+                # INS: Only export active camera
+                if evaluated_obj.name_full == b_scene.camera.name_full:
+                    to_worlds = camera.export_camera(object_instance, b_scene, self.export_ctx)
+                    # INS: Save trajectory if camera is moving
+                    path_folder = os.path.join(self.export_ctx.directory, self.export_ctx.subfolders['camera_paths'])
+                    if to_worlds:
+                        os.makedirs(path_folder, exist_ok=True)
+                        with open(os.path.join(path_folder, object_instance.object.name+".json"), "w") as f:
+                            json.dump(to_worlds, f)
             elif object_type == 'LIGHT':
                 lights.export_light(object_instance, self.export_ctx)
             else:

@@ -79,8 +79,9 @@ class ExportContext:
             'texture': 'textures',
             'emitter': 'textures',
             'shape': 'meshes',
-            'spectrum': 'spectra'
-                            }
+            'spectrum': 'spectra',
+            'camera_paths': 'cameras'
+        }
 
 
     def data_add(self, mts_dict, name=''):

@@ -1,5 +1,6 @@
-from mathutils import Matrix
 import numpy as np
+import bpy
+from mathutils import Matrix
 from math import degrees
 
 def export_camera(camera_instance, b_scene, export_ctx):
@@ -61,7 +62,25 @@ def export_camera(camera_instance, b_scene, export_ctx):
 
     params['film'] = film
 
-    if export_ctx.export_ids:
-        export_ctx.data_add(params, name=b_camera.name_full)
+    # INS: We always name our camera to 'camera'
+    export_ctx.data_add(params, name='camera')
+
+    # INS: Store the transforms over for animation
+    start_frame = b_scene.frame_start
+    end_frame = b_scene.frame_end
+    init_rot = Matrix.Rotation(np.pi, 4, 'Y')
+    to_worlds = []
+    for frame in range(start_frame, end_frame+1):
+        bpy.context.scene.frame_set(frame)
+        to_world = export_ctx.transform_matrix(b_camera.matrix_world @ init_rot).matrix.numpy()
+        to_worlds.append(to_world)
+
+    # Naive test to check if the camera is stationary
+    to_worlds = np.asarray(to_worlds)
+    diff = to_worlds[1:] - to_worlds[:1,...]
+    if np.allclose(diff, 0):
+        to_worlds = []
     else:
-        export_ctx.data_add(params)
+        to_worlds = to_worlds.tolist()
+
+    return to_worlds
