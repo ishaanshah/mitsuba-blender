@@ -1,5 +1,7 @@
+import os
 import bpy
 import numpy as np
+from mitsuba import ScalarTransform4f
 from mathutils import Matrix
 from .export_context import Files
 
@@ -326,6 +328,38 @@ def convert_principled_materials_cycles(export_ctx, current_node):
         })
         return two_sided_bsdf(params)
 
+def convert_glint_materials_cycles(export_ctx, current_node):
+    if not current_node.node_tree.type == "Glint":
+        raise NotImplementedError("Only 'Glint' NodeGroup supported.")
+    
+    alpha = current_node.inputs['Roughness'] ** 2
+    img = current_node.node_tree.nodes['Image Texture'].image
+    filename = os.path.join("textures", os.path.basename(bpy.path.abspath(img.filepath)))
+    uv_scale = current_node.inputs['UV Scale']
+
+    # We export two materials
+    # roughconductor_normalmap
+    rc_nm = {
+        "type": "rougconductor_normalmap",
+        "alpha": alpha,
+        "distribution": "gaussian",
+        "normalmap": {
+            "type": "bitmap",
+            "filename": filename,
+            "to_uv": ScalarTransform4f.scale([uv_scale, uv_scale])
+        }
+    }
+
+    # glint_dummy
+    dummy = {
+        "type": "glint_dummy",
+        "alpha": {
+            "type": "uniform",
+            "alpha": alpha
+        }
+    }
+
+    return [rc_nm, dummy]
 
 #TODO: Add more support for other materials: refraction, transparent, translucent
 cycles_converters = {
@@ -336,6 +370,8 @@ cycles_converters = {
     'EMISSION': convert_emitter_materials_cycles,
     'MIX_SHADER': convert_mix_materials_cycles,
     'ADD_SHADER': convert_add_materials_cycles,
+    # INS: We have a custom glint node group
+    'GROUP': convert_glint_materials_cycles
 }
 
 def cycles_material_to_dict(export_ctx, node):
@@ -393,11 +429,20 @@ def export_material(export_ctx, material):
         #material was already exported
         return
 
-    if isinstance(mat_params, list): # Add/mix shader
+    if isinstance(mat_params, list): # Add/mix/glint shader
         mats = {}
         for mat in mat_params:
             if mat['type'] == 'area': # Emitter
                 mats['emitter'] = mat # Directly store the emitter, we don't reference emitters
+            elif mat['type'] == 'roughconductor_normalmap':
+                # INS: This comes from 'glint'
+                mat['id'] = mat_id + '-MC'
+                mats['bsdf'] = mat_id + "-MC"
+                export_ctx.data_add(mat)
+            elif mat['type'] == 'glint_dummy':
+                # INS: This comes from 'glint'
+                mat['id'] = mat_id + '-SH'
+                export_ctx.data_add(mat)
             else:#bsdf
                 mat['id'] = mat_id
                 mats['bsdf'] = mat_id

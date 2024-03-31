@@ -56,13 +56,8 @@ def export_camera(camera_instance, b_scene, export_ctx):
     if b_scene.render.engine == 'MITSUBA':
         film['rfilter'] = getattr(b_camera.data.mitsuba.rfilters, b_camera.data.mitsuba.active_rfilter).to_dict()
     elif b_scene.render.engine == 'CYCLES':
-        if b_scene.cycles.pixel_filter_type == 'GAUSSIAN':
-            film['rfilter'] = {
-                'type': 'gaussian',
-                'stddev' : b_scene.cycles.filter_width
-            }
-        elif b_scene.cycles.pixel_filter_type == 'BOX':
-            film['rfilter'] = {'type' : 'box'}
+        # INS: Changed to only box filter
+        film['rfilter'] = {'type' : 'box'}
 
     params['film'] = film
 
