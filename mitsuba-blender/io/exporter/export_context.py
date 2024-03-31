@@ -73,6 +73,8 @@ class ExportContext:
         self.directory = ''
         self.axis_mat = Matrix() # Coordinate shift
         self.deg = None # Dependency graph
+        # INS: Matrix which transforms from WRC to Envmap coordinates
+        self.world_to_envmap = Matrix()
         self.subfolders = {
             'texture': 'textures',
             'emitter': 'textures',
@@ -210,7 +212,7 @@ class ExportContext:
         '''
         from mitsuba import ScalarTransform4f
         if len(matrix) == 4:
-            mat = self.axis_mat @ matrix
+            mat = self.axis_mat @ self.world_to_envmap @ matrix
         else: #3x3
             mat = matrix.to_4x4()
         return ScalarTransform4f(list([list(x) for x in mat]))

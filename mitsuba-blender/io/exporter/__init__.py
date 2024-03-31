@@ -14,6 +14,8 @@ if "bpy" in locals():
         importlib.reload(camera)
 
 import bpy
+import numpy as np
+from mathutils import Matrix
 
 from . import export_context
 from . import materials
@@ -55,13 +57,17 @@ class SceneConverter:
         if b_scene.render.engine == 'MITSUBA':
             integrator = getattr(b_scene.mitsuba.available_integrators,b_scene.mitsuba.active_integrator).to_dict()
         else:
+            # INS: We only need direct integrator for 'glints'
             integrator = {
-                'type':'path',
-                'max_depth': b_scene.cycles.max_bounces
+                'type':'direct',
+                'sample_center': False
             }
         self.export_ctx.data_add(integrator)
 
-        materials.export_world(self.export_ctx, b_scene.world, self.ignore_background)
+        # INS: We apply the inverse of envmap to_world and an additional -pi/2 to fix change of coordinates.
+        envmap_to_world = materials.export_world(self.export_ctx, b_scene.world, self.ignore_background)
+        envmap_to_world = Matrix.Rotation(np.pi / 2, 4, 'Z') @ envmap_to_world
+        self.export_ctx.world_to_envmap = envmap_to_world.inverted()
 
         # Establish list of particle objects
         particles = []

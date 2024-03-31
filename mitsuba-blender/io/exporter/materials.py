@@ -361,7 +361,7 @@ def convert_glint_materials_cycles(export_ctx, current_node):
         "type": "glint_dummy",
         "alpha": {
             "type": "uniform",
-            "alpha": alpha
+            "value": alpha
         }
     }
 
@@ -492,6 +492,7 @@ def convert_world(export_ctx, world, ignore_background):
         export_ctx.log('No Blender world to export.', 'INFO')
         return
 
+    to_world = Matrix()#4x4 Identity
     if world.use_nodes and world.node_tree is not None:
         output_node_id = 'World Output'
         if output_node_id not in world.node_tree.nodes:
@@ -520,7 +521,6 @@ def convert_world(export_ctx, world, ignore_background):
                         'scale': strength
                     })
                     coordinate_mat = Matrix(((0,0,1,0),(1,0,0,0),(0,1,0,0),(0,0,0,1)))
-                    to_world = Matrix()#4x4 Identity
                     if color_node.inputs["Vector"].is_linked:
                         vector_node = color_node.inputs["Vector"].links[0].from_node
                         if vector_node.type != 'MAPPING':
@@ -550,7 +550,7 @@ def convert_world(export_ctx, world, ignore_background):
                         to_world = to_world
                     #TODO: support other types of mappings (vector, point...)
                     #change default position, apply transform and change coordinates
-                    params['to_world'] = export_ctx.transform_matrix(to_world @ coordinate_mat)
+                    # params['to_world'] = export_ctx.transform_matrix(to_world @ coordinate_mat)
                 elif color_node.type == 'RGB':
                     color = color_node.color
                 else:
@@ -582,6 +582,9 @@ def convert_world(export_ctx, world, ignore_background):
         export_ctx.data_add(params, "World")
     else:
         export_ctx.data_add(params)
+    
+    # INS: Use this to apply inverse transform on everything else
+    return to_world
 
 def export_world(export_ctx, world, ignore_background):
     '''
@@ -591,6 +594,7 @@ def export_world(export_ctx, world, ignore_background):
     '''
 
     try:
-        convert_world(export_ctx, world, ignore_background)
+        return convert_world(export_ctx, world, ignore_background)
     except NotImplementedError as err:
         export_ctx.log("Error while exporting world: %s. Not exporting it." % err.args[0], 'WARN')
+        return Matrix()
