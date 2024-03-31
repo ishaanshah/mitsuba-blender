@@ -38,6 +38,11 @@ def init_mitsuba(context):
             import importlib
             importlib.reload(mitsuba)
         mitsuba.set_variant('scalar_rgb')
+
+        # INS: Register all of our custom BSDFs here
+        mitsuba.register_bsdf("roughconductor_normalmap", lambda props: None)
+        mitsuba.register_bsdf("glint_dummy", lambda props: None)
+
         # Set the global threading environment
         from mitsuba import ThreadEnvironment
         bpy.types.Scene.thread_env = ThreadEnvironment()

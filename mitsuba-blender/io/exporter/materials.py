@@ -1,9 +1,10 @@
 import os
 import bpy
 import numpy as np
-from mitsuba import ScalarTransform4f
 from mathutils import Matrix
+from pathlib import Path
 from .export_context import Files
+
 
 RoughnessMode = {'GGX': 'ggx', 'BECKMANN': 'beckmann', 'ASHIKHMIN_SHIRLEY':'beckmann', 'MULTI_GGX':'ggx'}
 #TODO: update when other distributions are supported
@@ -329,24 +330,29 @@ def convert_principled_materials_cycles(export_ctx, current_node):
         return two_sided_bsdf(params)
 
 def convert_glint_materials_cycles(export_ctx, current_node):
-    if not current_node.node_tree.type == "Glint":
+    from mitsuba import ScalarTransform4f
+
+    if not current_node.node_tree.name == "Glint":
         raise NotImplementedError("Only 'Glint' NodeGroup supported.")
     
-    alpha = current_node.inputs['Roughness'] ** 2
+    # TODO: Support texture
+    alpha = current_node.inputs['Roughness'].default_value ** 2
     img = current_node.node_tree.nodes['Image Texture'].image
-    filename = os.path.join("textures", os.path.basename(bpy.path.abspath(img.filepath)))
-    uv_scale = current_node.inputs['UV Scale']
+    filename = Path("textures", os.path.basename(bpy.path.abspath(img.filepath))).as_posix()
+    uv_scale = current_node.inputs['UV Scale'].default_value
 
     # We export two materials
     # roughconductor_normalmap
     rc_nm = {
-        "type": "rougconductor_normalmap",
+        "type": "roughconductor_normalmap",
         "alpha": alpha,
         "distribution": "gaussian",
         "normalmap": {
             "type": "bitmap",
             "filename": filename,
-            "to_uv": ScalarTransform4f.scale([uv_scale, uv_scale])
+            "to_uv": ScalarTransform4f.scale([uv_scale, uv_scale, 1]),
+            "raw": True,
+            "filter_type": "nearest"
         }
     }
 
@@ -431,23 +437,24 @@ def export_material(export_ctx, material):
 
     if isinstance(mat_params, list): # Add/mix/glint shader
         mats = {}
+        is_glint = False
         for mat in mat_params:
             if mat['type'] == 'area': # Emitter
                 mats['emitter'] = mat # Directly store the emitter, we don't reference emitters
             elif mat['type'] == 'roughconductor_normalmap':
                 # INS: This comes from 'glint'
-                mat['id'] = mat_id + '-MC'
-                mats['bsdf'] = mat_id + "-MC"
-                export_ctx.data_add(mat)
+                export_ctx.data_add(mat, mat_id)
+                is_glint = True
             elif mat['type'] == 'glint_dummy':
                 # INS: This comes from 'glint'
-                mat['id'] = mat_id + '-SH'
-                export_ctx.data_add(mat)
+                export_ctx.data_add(mat, mat_id+'-SH')
+                is_glint = True
             else:#bsdf
                 mat['id'] = mat_id
                 mats['bsdf'] = mat_id
                 export_ctx.data_add(mat)
-        export_ctx.exported_mats.add_material(mats, mat_id)
+        if not is_glint:
+            export_ctx.exported_mats.add_material(mats, mat_id)
     else:
         if mat_params['type'] == 'area': # Emitter with no bsdf
             mats = {}
@@ -465,6 +472,7 @@ def export_material(export_ctx, material):
 
         else: # Usual case
             export_ctx.data_add(mat_params, mat_id)
+    print(export_ctx.exported_mats.mats)
 
 def convert_world(export_ctx, world, ignore_background):
     """
