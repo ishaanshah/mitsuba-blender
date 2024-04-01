@@ -158,9 +158,10 @@ class ExportContext:
             os.makedirs(textures_folder)
         old_filepath = image.filepath
         image.filepath_raw = target_path
-        image.save()
+        # INS: We don't want to save textures for 'glints' project, we store them separately
+        # image.save()
         image.filepath_raw = old_filepath
-        return f"{self.subfolders['texture']}/{name}"
+        return name
 
     def spectrum(self, value, mode='rgb'):
         '''

@@ -45,6 +45,7 @@ def convert_float_texture_node(export_ctx, socket):
     return params
 
 def convert_color_texture_node(export_ctx, socket):
+    from mitsuba import ScalarTransform4f
     params = None
 
     if socket.is_linked:
@@ -60,6 +61,15 @@ def convert_color_texture_node(export_ctx, socket):
             params = {
                 'type': 'mesh_attribute',
                 'name': 'vertex_%s' % node.layer_name
+            }
+        elif node.type == "TEX_CHECKER":
+            scale = node.inputs['Scale'].default_value / 2     # Blender scaling is 2x of Mitsuba
+            params = {
+                "type": "checkerboard",
+                # Blender and Mitsuba colors are swapped
+                "color0": convert_color_texture_node(export_ctx, node.inputs['Color2']),
+                "color1": convert_color_texture_node(export_ctx, node.inputs['Color1']),
+                "to_uv": ScalarTransform4f.scale([scale, scale, 1])
             }
         else:
             raise NotImplementedError("Node type %s is not supported. Only texture & RGB nodes are supported for color inputs" % node.type)
@@ -515,12 +525,17 @@ def convert_world(export_ctx, world, ignore_background):
             if socket.is_linked:
                 color_node = socket.links[0].from_node
                 if color_node.type == 'TEX_ENVIRONMENT':
+                    envmap_path = "envmaps/" + export_ctx.export_texture(color_node.image)
                     params.update({
                         'type': 'envmap',
-                        'filename': export_ctx.export_texture(color_node.image),
+                        # INS: All our envmaps are stored in the 'envmaps' directory.
+                        'filename': envmap_path,
                         'scale': strength
                     })
-                    coordinate_mat = Matrix(((0,0,1,0),(1,0,0,0),(0,1,0,0),(0,0,0,1)))
+                    # INS: Save the envmap name in a txt file so that we can read it in our rendering script
+                    with open(os.path.join(export_ctx.directory, "envmap.txt"), "w") as f:
+                        f.write(envmap_path + "\n")
+                        f.write(str(strength) + "\n")
                     if color_node.inputs["Vector"].is_linked:
                         vector_node = color_node.inputs["Vector"].links[0].from_node
                         if vector_node.type != 'MAPPING':
