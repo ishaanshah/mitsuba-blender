@@ -165,6 +165,8 @@ class ExportMitsuba(bpy.types.Operator, ExportHelper):
         self.converter.export_ctx.export_ids = self.export_ids
         self.converter.export_ctx.blender_triangulation = self.blender_triangulation
         self.converter.export_ctx.bake_display_transform = self.bake_display_transform
+        # The scene's exporting mode, as the render engine reads it
+        self.converter.export_ctx.strict = context.scene.mitsuba.export_mode == 'strict'
         # Meshes and textures are written to subfolders of the target directory
         self.converter.export_ctx.directory = os.path.dirname(self.filepath)
 
